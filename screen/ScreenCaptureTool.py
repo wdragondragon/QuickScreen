@@ -19,6 +19,8 @@ class ScreenCaptureTool(QMainWindow):
         self.end_y = None
         self.is_selecting = False
         self.is_dragging = False
+        self.is_resizing = False
+        self.resize_handle_size = 10  # 处理矩形边缘拖拽的大小
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.setWindowTitle("Screen Capture Tool")
@@ -59,7 +61,11 @@ class ScreenCaptureTool(QMainWindow):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if not self.is_selecting and not self.is_dragging:
+            if self.is_near_edge(event.x(), event.y()):
+                self.is_resizing = True
+                self.drag_start_x = event.x()
+                self.drag_start_y = event.y()
+            elif not self.is_selecting and not self.is_dragging:
                 # 开始选择区域
                 self.start_x = event.x()
                 self.start_y = event.y()
@@ -76,7 +82,14 @@ class ScreenCaptureTool(QMainWindow):
             self.cancel_capture()
 
     def mouseMoveEvent(self, event):
-        if self.is_selecting:
+        if self.is_resizing:
+            # 更新矩形大小
+            new_x = event.x()
+            new_y = event.y()
+            self.end_x = new_x
+            self.end_y = new_y
+            self.update()  # 触发重绘事件
+        elif self.is_selecting:
             # 更新结束坐标
             self.end_x = event.x()
             self.end_y = event.y()
@@ -95,7 +108,12 @@ class ScreenCaptureTool(QMainWindow):
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
-            if self.is_selecting:
+            if self.is_resizing:
+                self.is_resizing = False
+                self.update_buttons()
+                self.confirm_button.show()
+                self.cancel_button.show()
+            elif self.is_selecting:
                 # 完成选择，显示确认和取消按钮
                 self.is_selecting = False
                 self.is_dragging = True
@@ -113,6 +131,24 @@ class ScreenCaptureTool(QMainWindow):
             painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.SolidLine))
             rect = QRect(self.start_x, self.start_y, self.end_x - self.start_x, self.end_y - self.start_y)
             painter.drawRect(rect)  # 绘制矩形
+
+            # 绘制调整大小的把手
+            self.draw_resize_handles(painter, rect)
+
+    def draw_resize_handles(self, painter, rect):
+        handle_size = self.resize_handle_size
+        painter.setBrush(QColor(255, 0, 0))
+        # 绘制右下角把手
+        painter.drawRect(rect.right() - handle_size, rect.bottom() - handle_size, handle_size, handle_size)
+
+    def is_near_edge(self, x, y):
+        # 判断鼠标是否接近矩形的边缘
+        if self.start_x is not None and self.start_y is not None:
+            rect = QRect(self.start_x, self.start_y, self.end_x - self.start_x, self.end_y - self.start_y)
+            handle_size = self.resize_handle_size
+            return (rect.right() - handle_size <= x <= rect.right() and
+                    rect.bottom() - handle_size <= y <= rect.bottom())
+        return False
 
     def update_buttons(self):
         # 更新按钮位置，使其跟随矩形右下方
