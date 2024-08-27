@@ -1,6 +1,6 @@
 from PyQt5.QtCore import Qt, QRect
 from PyQt5.QtGui import QPainter, QPen, QColor
-from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton
+from PyQt5.QtWidgets import QApplication, QMainWindow, QLabel, QPushButton, QLineEdit
 import sys
 import uuid
 import mss
@@ -22,7 +22,7 @@ class ScreenCaptureTool(QMainWindow):
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.setWindowTitle("Screen Capture Tool")
-        self.setWindowOpacity(0.3)  # 设置窗口半透明
+        self.setWindowOpacity(0.5)  # 设置窗口半透明
         self.setCursor(Qt.CrossCursor)
         self.sct = mss.mss()
         self.rect = QLabel(self)
@@ -37,6 +37,25 @@ class ScreenCaptureTool(QMainWindow):
         self.cancel_button = QPushButton('取消', self)
         self.cancel_button.hide()
         self.cancel_button.clicked.connect(self.cancel_capture)
+
+        # 创建输入框和确认按钮用于输入坐标
+        self.input_box = QLineEdit(self)
+        self.input_box.setPlaceholderText("输入坐标格式: x1,y1,x2,y2")
+        self.input_box.setGeometry(10, 10, 400, 30)
+        self.input_box.setStyleSheet("background-color: white;")  # 设置输入框背景为白色
+        self.input_box.show()  # 确保输入框在初始化时显示
+
+        self.input_confirm_button = QPushButton('使用坐标截图', self)
+        self.input_confirm_button.setGeometry(420, 10, 200, 30)
+        self.input_confirm_button.setStyleSheet("background-color: white;")  # 设置按钮背景为白色
+        self.input_confirm_button.clicked.connect(self.update_rectangle_from_input)
+        self.input_confirm_button.show()  # 确保按钮在初始化时显示
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            self.cancel_capture()
+        elif self.is_dragging and (event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter):
+            self.confirm_capture()
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -86,6 +105,7 @@ class ScreenCaptureTool(QMainWindow):
             elif self.is_dragging:
                 # 停止拖动
                 self.update_buttons()
+            self.input_box.setText(f"{self.start_x},{self.start_y},{self.end_x},{self.end_y}")
 
     def paintEvent(self, event):
         if self.start_x is not None and self.start_y is not None:
@@ -96,10 +116,14 @@ class ScreenCaptureTool(QMainWindow):
 
     def update_buttons(self):
         # 更新按钮位置，使其跟随矩形右下方
+        x1 = min(self.start_x, self.end_x)
+        y1 = min(self.start_y, self.end_y)
         x2 = max(self.start_x, self.end_x)
         y2 = max(self.start_y, self.end_y)
         self.confirm_button.move(x2 - self.confirm_button.width(), y2 + 10)
         self.cancel_button.move(x2 - self.cancel_button.width() - self.confirm_button.width() - 10, y2 + 10)
+        self.input_box.move(x1, y1 - self.input_box.height() - 10)
+        self.input_confirm_button.move(x1 + self.input_box.width() + 10, y1 - self.input_confirm_button.height() - 10)
 
     def confirm_capture(self):
         # 确认截图
@@ -136,6 +160,20 @@ class ScreenCaptureTool(QMainWindow):
         win32clipboard.EmptyClipboard()
         win32clipboard.SetClipboardData(win32clipboard.CF_DIB, data)
         win32clipboard.CloseClipboard()
+
+    def update_rectangle_from_input(self):
+        # 根据输入框中的坐标更新矩形位置
+        coords = self.input_box.text().strip()
+        try:
+            x1, y1, x2, y2 = map(int, coords.split(','))
+            self.start_x, self.start_y, self.end_x, self.end_y = x1, y1, x2, y2
+            self.is_dragging = True  # 启用拖拽模式
+            self.update()  # 更新绘制
+            self.update_buttons()  # 更新按钮位置
+            self.confirm_button.show()
+            self.cancel_button.show()
+        except ValueError:
+            print("请输入有效的坐标，格式为: x1,y1,x2,y2")
 
 
 def main():
