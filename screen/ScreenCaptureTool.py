@@ -131,7 +131,7 @@ class ScreenCaptureTool(QMainWindow):
             painter.setPen(QPen(QColor(255, 0, 0), 2, Qt.SolidLine))
             rect = QRect(self.start_x, self.start_y, self.end_x - self.start_x, self.end_y - self.start_y)
             painter.drawRect(rect)  # 绘制矩形
-
+            self.update_buttons()
             # 绘制调整大小的把手
             self.draw_resize_handles(painter, rect)
 
